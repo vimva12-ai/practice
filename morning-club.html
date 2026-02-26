@@ -313,6 +313,9 @@
         <div class="profile-email" id="profileEmail">demo@gmail.com</div>
         <div class="badge-shelf" id="badgeShelf"></div>
         <div>
+          <button class="btn-outline" onclick="openBadgeList()">🏅 뱃지 목록 보기</button>
+        </div>
+        <div>
           <button class="btn-outline" onclick="openEditProfile()">✏️ 닉네임 변경</button>
           <button class="btn-outline" onclick="openEditEmoji()">😊 이모지 변경</button>
         </div>
@@ -383,6 +386,17 @@
   </div>
 </div>
 
+<!-- 뱃지 목록 모달 -->
+<div class="modal-bg" id="modalBadges">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title">🏅 뱃지 목록</div>
+    <div id="badgeListContent" style="max-height:60vh;overflow-y:auto"></div>
+    <div class="modal-btns">
+      <button class="btn-confirm" onclick="closeModal('modalBadges')">닫기</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const EMOJIS=["🌟","🦁","🐰","🦊","🐸","🐼","🦋","🌸","🌈","🔥","⚡","🎯","🚀","🍀","🌻","🐯","🦅","🐬","🦄","🎸"];
 const DAYS=["일","월","화","수","목","금","토"];
@@ -400,12 +414,21 @@ let currentPresetDays=7;
 let reactions={};   // { "u1-0": { "👍": 3, "❤️": 1 }, ... }
 let myReactions={}; // { "u1-0": "👍" }
 const BADGES=[
-  {id:"first",  emoji:"🌱", label:"첫 발걸음",  check:(total,streak)=>total>=1},
-  {id:"s7",     emoji:"🔥", label:"7일 연속",   check:(total,streak)=>streak>=7},
-  {id:"t10",    emoji:"💪", label:"총 10회",    check:(total,streak)=>total>=10},
-  {id:"t30",    emoji:"⭐", label:"총 30회",    check:(total,streak)=>total>=30},
-  {id:"t100",   emoji:"👑", label:"총 100회",   check:(total,streak)=>total>=100},
-  {id:"s30",    emoji:"🌙", label:"30일 연속",  check:(total,streak)=>streak>=30},
+  {id:"first",   emoji:"🌱", label:"첫 발걸음",  desc:"처음으로 출석하기",               check:(r,s)=>r.length>=1},
+  {id:"s3",      emoji:"🌤️", label:"사흘 연속",  desc:"3일 연속 출석",                   check:(r,s)=>s>=3},
+  {id:"t5",      emoji:"💫", label:"총 5회",     desc:"총 5회 출석",                     check:(r,s)=>r.length>=5},
+  {id:"s7",      emoji:"🔥", label:"7일 연속",   desc:"7일 연속 출석",                   check:(r,s)=>s>=7},
+  {id:"t10",     emoji:"💪", label:"총 10회",    desc:"총 10회 출석",                    check:(r,s)=>r.length>=10},
+  {id:"s14",     emoji:"📅", label:"2주 연속",   desc:"14일 연속 출석",                  check:(r,s)=>s>=14},
+  {id:"t30",     emoji:"⭐", label:"총 30회",    desc:"총 30회 출석",                    check:(r,s)=>r.length>=30},
+  {id:"weekend", emoji:"🌸", label:"주말 전사",  desc:"주말(토·일) 10회 출석",           check:(r,s)=>r.filter(x=>x.day==="토"||x.day==="일").length>=10},
+  {id:"longlog", emoji:"✍️", label:"기록왕",     desc:"50자 이상 일지 10개 작성",        check:(r,s)=>r.filter(x=>x.log&&x.log.length>=50).length>=10},
+  {id:"s30",     emoji:"🌙", label:"30일 연속",  desc:"30일 연속 출석",                  check:(r,s)=>s>=30},
+  {id:"pub20",   emoji:"🌐", label:"공개 마니아",desc:"공개 일지 20개 작성",             check:(r,s)=>r.filter(x=>x.isPublic).length>=20},
+  {id:"t50",     emoji:"🌊", label:"총 50회",    desc:"총 50회 출석",                    check:(r,s)=>r.length>=50},
+  {id:"t100",    emoji:"👑", label:"총 100회",   desc:"총 100회 출석",                   check:(r,s)=>r.length>=100},
+  {id:"s60",     emoji:"🏔️", label:"60일 연속",  desc:"60일 연속 출석",                  check:(r,s)=>s>=60},
+  {id:"t200",    emoji:"💎", label:"레전드",     desc:"총 200회 출석",                   check:(r,s)=>r.length>=200},
 ];
 
 // 데모 출석 기록 (공개여부 포함)
@@ -801,9 +824,8 @@ function getStreak(){
 
 // ---- 뱃지 ----
 function getEarnedBadges(){
-  const total=myRecords.length;
   const streak=getStreak();
-  return BADGES.filter(b=>b.check(total,streak));
+  return BADGES.filter(b=>b.check(myRecords,streak));
 }
 function renderBadges(){
   const shelf=document.getElementById("badgeShelf");
@@ -812,6 +834,22 @@ function renderBadges(){
   shelf.innerHTML=earned.length===0
     ?`<span style="font-size:13px;color:var(--sub)">뱃지를 모아보세요 🌱</span>`
     :earned.map(b=>`<span class="badge-pill">${b.emoji} ${b.label}</span>`).join("");
+}
+function openBadgeList(){
+  const streak=getStreak();
+  const earnedIds=new Set(getEarnedBadges().map(b=>b.id));
+  const html=BADGES.map(b=>{
+    const earned=earnedIds.has(b.id);
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #F5F0EA;${earned?'':'opacity:.4'}">
+      <span style="font-size:28px;min-width:36px;text-align:center">${b.emoji}</span>
+      <div style="flex:1">
+        <div style="font-weight:700">${b.label} ${earned?'<span style="color:#2E7D32;font-size:12px">✅ 획득</span>':'<span style="font-size:12px;color:var(--sub)">🔒 미획득</span>'}</div>
+        <div style="font-size:12px;color:var(--sub);margin-top:2px">${b.desc}</div>
+      </div>
+    </div>`;
+  }).join("");
+  document.getElementById("badgeListContent").innerHTML=html;
+  openModal("modalBadges");
 }
 
 // ---- 반응 ----
